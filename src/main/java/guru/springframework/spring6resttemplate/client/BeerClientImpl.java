@@ -2,27 +2,92 @@ package guru.springframework.spring6resttemplate.client;
 
 import guru.springframework.spring6resttemplate.model.BeerDTO;
 import guru.springframework.spring6resttemplate.model.BeerDTOPageImpl;
+import guru.springframework.spring6resttemplate.model.BeerStyle;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class BeerClientImpl implements BeerClient {
     private final RestTemplateBuilder restTemplateBuilder;
 
-    private static final String BASE_URL = "http://localhost:8080";
-    private static final String GET_BEER_PATH = "/api/v1/beer";
+    public static final String GET_BEER_PATH = "/api/v1/beer";
+    public static final String GET_BEER_BY_ID_PATH = "/api/v1/beer/{beerId}";
+
+    @Override
+    public BeerDTO updateBeer(BeerDTO beerDto) {
+        RestTemplate restTemplate = this.restTemplateBuilder.build();
+
+        restTemplate.put(GET_BEER_BY_ID_PATH, beerDto, beerDto.getId());
+
+        return this.getBeerById(beerDto.getId());
+    }
+
+    @Override
+    public void deleteBeer(UUID beerId) {
+        RestTemplate restTemplate = this.restTemplateBuilder.build();
+
+        restTemplate.delete(GET_BEER_BY_ID_PATH, beerId);
+    }
+
+    @Override
+    public BeerDTO createBeer(BeerDTO newDto) {
+        RestTemplate restTemplate = this.restTemplateBuilder.build();
+
+        URI uri = restTemplate.postForLocation(GET_BEER_PATH, newDto);
+
+        return restTemplate.getForObject(uri.getPath(), BeerDTO.class);
+    }
+
+    @Override
+    public BeerDTO getBeerById(UUID beerId) {
+        RestTemplate restTemplate = this.restTemplateBuilder.build();
+
+        return restTemplate.getForObject(GET_BEER_BY_ID_PATH, BeerDTO.class, beerId);
+    }
 
     @Override
     public Page<BeerDTO> listBeers() {
-        RestTemplate restTemplate = this.restTemplateBuilder.build();
-        ResponseEntity<BeerDTOPageImpl> stringResponse =
-                restTemplate.getForEntity(BASE_URL + GET_BEER_PATH, BeerDTOPageImpl.class);
+        return this.listBeers(null, null, null, null, null);
+    }
 
-        return null;
+    @Override
+    public Page<BeerDTO> listBeers(String beerName, BeerStyle beerStyle, Boolean showInventory,
+                                   Integer pageNumber, Integer pageSize) {
+        RestTemplate restTemplate = this.restTemplateBuilder.build();
+        UriComponentsBuilder uriComponentsBuilder = UriComponentsBuilder.fromPath(GET_BEER_PATH);
+
+        if (beerName != null) {
+            uriComponentsBuilder.queryParam("beerName", beerName);
+        }
+
+        if (beerStyle != null) {
+            uriComponentsBuilder.queryParam("beerStyle", beerStyle);
+        }
+
+        if (showInventory != null) {
+            uriComponentsBuilder.queryParam("showInventory", showInventory);
+        }
+
+        if (pageNumber != null) {
+            uriComponentsBuilder.queryParam("pageNumber", pageNumber);
+        }
+
+        if (pageSize != null) {
+            uriComponentsBuilder.queryParam("pageSize", pageSize);
+        }
+
+        ResponseEntity<BeerDTOPageImpl> response =
+                restTemplate.getForEntity(uriComponentsBuilder.toUriString(), BeerDTOPageImpl.class);
+
+        return response.getBody();
     }
 }
