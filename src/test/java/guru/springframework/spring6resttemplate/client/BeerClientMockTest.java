@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -27,6 +28,7 @@ import java.util.Arrays;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
@@ -63,6 +65,50 @@ public class BeerClientMockTest {
         this.beerClient = new BeerClientImpl(this.mockRestTemplateBuilder);
         this.dto = this.getBeerDto();
         this.dtoJson = objectMapper.writeValueAsString(this.dto);
+    }
+
+    @Test
+    void testListBeersWithQueryParam() throws JsonProcessingException {
+        String response = this.objectMapper.writeValueAsString(this.getPage());
+
+        URI uri = UriComponentsBuilder.fromHttpUrl(URL + BeerClientImpl.GET_BEER_PATH)
+                .queryParam("beerName", "ALE")
+                .build().toUri();
+
+        this.server.expect(method(HttpMethod.GET))
+                .andExpect(requestTo(uri))
+                .andExpect(queryParam("beerName", "ALE"))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
+
+        Page<BeerDTO> responsePage = this.beerClient.listBeers("ALE", null,
+                null, null, null);
+
+        assertThat(responsePage.getContent().size()).isEqualTo(1);
+    }
+
+    @Test
+    void testDeleteNotFound() {
+        this.server.expect(method(HttpMethod.DELETE))
+                .andExpect(requestToUriTemplate(URL + BeerClientImpl.GET_BEER_BY_ID_PATH, dto.getId()))
+                .andRespond(withResourceNotFound());
+
+        assertThrows(HttpClientErrorException.class, () -> {
+            this.beerClient.deleteBeer(this.dto.getId());
+        });
+        // verify that the interaction with the mock did occur
+        server.verify();
+    }
+
+    @Test
+    void testDeleteBeer() {
+        this.server.expect(method(HttpMethod.DELETE))
+                .andExpect(requestToUriTemplate(URL + BeerClientImpl.GET_BEER_BY_ID_PATH, dto.getId()))
+                .andRespond(withNoContent());
+
+        this.beerClient.deleteBeer(this.dto.getId());
+
+        // verify that the interaction with the mock did occur
+        server.verify();
     }
 
     @Test
